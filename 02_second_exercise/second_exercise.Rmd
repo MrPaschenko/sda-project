@@ -1,0 +1,471 @@
+---
+title: "SAP - Second auditory exercise"
+author: "Tessa Bauman, Stjepan Begušić, David Bojanić, Krunoslav Jurčić, Tomislav Kovačević, Andro Merćep"
+date: "16.11.2022."
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+subtitle: 'Case study *FIFA 19 data*: Statistical inference for numerical and categorical data'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+The second exercise deals with hypothesis testing and calculating the $p$-value on real world examples for numerical data (using the $t$-test, $\chi^2$-test and $F$-test) and categorical data (using the $\chi^2$-test and Fisher-Irwin exact test).
+
+## Case study: *FIFA 19*
+
+[Kaggle.com](https://www.kaggle.com/ "Kaggle.com") is a web page intended for hosting competitions on various machine learning and statistical data analysis tasks. Other than hosting competitions however, Kaggle offers researches many freely available datasets, their analysis, computer science courses and computing power.
+
+One of those freely available datasets is the  [FIFA dataset](https://www.kaggle.com/stefanoleone992/fifa-20-complete-player-dataset?select=players_20.csv "FIFA data"), comprised of football players  (and their statistics) that participated in the five football computer games FIFA 2015 - 2020. As stated in the description of the dataset, the original data were scraped from the [sofifa](https://sofifa.com/) web page. There, we can find the meaning of each variable from the given data.
+In this exercise, we focus on the FIFA 2019 and 2020 datasets to test several interesting hypotheses.
+
+As with any new dataset we analyze, it is important to know the context of the data so we can correctly interpret the final results! Therefore, before answering any questions or testing any hypothesis, we use the tools of descriptive analysis to get acquainted with our dataset.
+
+
+# Descriptive analysis
+
+Firstly, we load the necessary R packages to facilitate our analysis.
+
+```{r echo=T, error=FALSE, warning=FALSE, message=FALSE}
+library(dplyr)
+```
+
+
+Let's load the FIFA 2019 dataset.
+
+```{r}
+fifa19 = read.csv("datasets/players_19.csv")
+dim(fifa19)
+```
+
+As we can see, the data is comprised of 17770 players and 104 variables that describe them.
+
+What are the variables?
+
+```{r}
+names(fifa19)
+```
+
+The players are described with various general variables (like their name, age, the football club they are playing for, etc.) and "football" variables (like the attack, defense and other characteristics).
+
+```{r}
+View(fifa19)
+```
+
+We can immediately see that not all of the dataset variables are equally useful. For example, the variable "player_url" is the web url linking the football player with its sofifa page from where the data was scraped. We cannot use such a variable to do any statistical analysis. Therefore, as is often recommended, we are going to eliminate the variable (along with other similarly unnecessary variables) to create a more concise and uncluttered dataset.
+
+```{r}
+fifa19 = select(fifa19, -c("player_url","long_name","real_face","player_tags","loaned_from","player_traits"))
+dim(fifa19)
+```
+
+We are left with 98 variables that describe our players.
+
+How do our variables behave?
+
+```{r}
+summary(fifa19)
+```
+
+
+```{r}
+sapply(fifa19, class)
+```
+
+The dataset is mostly comprised of "integer" and "character" data.
+
+```{r}
+for (col_name in names(fifa19)){
+  if (sum(is.na(fifa19[,col_name])) > 0){
+    cat('Number of missing values for variable ',col_name, ': ', sum(is.na(fifa19[,col_name])),'\n')
+  }
+}
+
+cat('\n Dimension of the dataset: ', dim(fifa19))
+```
+
+We can notice that a big portion of variables starting with the prefix "gk_*" are missing. This does make sense and does not point to corrupted (or badly acquired) data since these variables describe the goalkeeper characteristics. Most players are not goalkeepers, so they are naturally never evaluated as one. Therefore, we will not eliminate these variables.
+
+On the other hand, the variable "nation_jersey_number" has 93% of missing values which means that we have a lot of missing data. We eliminate this variable to, again, create a more clear and concise dataset.
+
+The remaining variables do not have a lot of missing values.
+
+```{r}
+fifa19 = select(fifa19, -c("nation_jersey_number"))
+dim(fifa19)
+```
+
+Let's now examine the variables we will later use to pose our hypotheses and answer several questions. We focus first on the numerical variables.
+
+```{r, fig.width = 14, fig.height=5}
+hist(fifa19$weight_kg,main='Weight in kg histogram', xlab='Weight', ylab='Frequency')
+hist(fifa19$height_cm,main='Height in cm histogram', xlab='Height', ylab='Frequency')
+hist(fifa19$value_eur,main='Value in eur histogram',xlab='Value',ylab='Frequency', breaks=50)
+hist(fifa19$wage_eur,main='Wage in eur histogram',xlab='Wage',ylab='Frequency', breaks=50)
+```
+
+The distribution of the value and wage of the players is very skewed. Let's see if the log transformation brings the data closer to a normal distribution.
+
+```{r, fig.width = 14, fig.height=5}
+hist(log(fifa19$value_eur),main='Value in eur histogram',xlab='Value',ylab='Frequency', breaks=50)
+hist(log(fifa19$wage_eur),main='Wage in eur histogram',xlab='Wage',ylab='Frequency', breaks=20)
+```
+
+The distribution of the value of the players now resembles the normal distribution, whereas the wage is still far away from it.
+
+Let's examine the categorical variables. 
+
+```{r,  fig.width = 14, fig.height=5}
+barplot(table(fifa19$nationality),las=2,cex.names=.5,main='Nationality of players')
+print('Players preferred kicking foot: ')
+table(fifa19$preferred_foot)
+barplot(table(fifa19$team_position),las=2,main='Player team position on the field')
+```
+
+We notice that the variable "team_position" contains players without any position.
+
+```{r}
+table(fifa19$team_position)
+```
+
+More concretely, there are 223 players with no position in the team. This is something we need to take into consideration for later analysis.
+
+After we have explored our dataset, we can try to answer some questions using the tools we have learned and R.
+
+## Are Croatian players taller than Spanish players?
+
+```{r}
+croatian_players = fifa19[fifa19$nationality == "Croatia",]
+spanish_players = fifa19[fifa19$nationality == "Spain",]
+```
+
+
+```{r}
+cat('Average height of croatian players ', mean(croatian_players$height_cm),'\n')
+cat('Average height of spanish players ', 
+    mean(spanish_players$height_cm), '\n')
+```
+
+```{r}
+boxplot(croatian_players$height_cm, spanish_players$height_cm, 
+        names = c('Croatian player heights','Spanish player heights'),
+        main='Boxplot of croatian and spanish player heights')
+```
+There are some indications that the Croatian players could be taller than the Spanish ones.
+
+We can use the $t$-test to answer our question. First, however, we need to check if our test has any assumptions over the data we are testing.
+
+
+### Testing the equality of means from two samples
+
+Let $X_1^1, X_1^2, \ldots, X_1^{n_1}$ and $X_2^1, X_2^2, \ldots, X_2^{n_2}$ be two independent random samples from the normal distribution with means $\mu_1$, $\mu_2$ and unknown, but equal, variances $\sigma$. The joint variance of the sample can be found as the weighted average of the sample variances $S_{X_1}$ i $S_{X_2}$:
+
+$$S_X^2 = \frac{1}{n_1 + n_2 - 2} [(n_1 - 1) S_{X_1}^2 + (n_2 - 1) S_{X_2}^2].$$
+
+The random variable
+$$Z = \frac{\bar{X}_1 - \bar{X}_2 - (\mu_1 - \mu_2)}{\sigma \sqrt{\frac{1}{n_1} + \frac{1}{n_2}}}$$
+
+has a unit normal distribution. The random variable
+$$W^2 = \frac{(n_1 - 1) S_{X_1}^2 + (n_2 - 1) S_{X_2}^2}{\sigma^2}$$
+
+has a $\chi^2$ distribution with $n_1 + n_2 - 2$ degrees of freedom. 
+Therefore, the random variable
+$$T = \frac{Z \sqrt{n_1 + n_2 - 2}}{W} = \frac{\bar{X}_1 - \bar{X}_2 - (\mu_1 - \mu_2)}{S_X \sqrt{\frac{1}{n_1} + \frac{1}{n_2}}}$$
+
+has an exact $t$-distribution with $n_1 + n_2 - 2$ degrees of freedom.
+
+If we have two independent and normally distributed samples, but this time with different variances, we can use the test statistic
+
+$$T' = \frac{\bar{X}_1 - \bar{X}_2 - (\mu_1 - \mu_2)}{\sqrt{\frac{s_{X_1}^2}{n_1} + \frac{s_{X_2}^2}{n_2}}}$$
+
+that has an approximate $t$-distribution with $v$ degrees of freedom 
+$$v = \frac{(s_{X_1}^2/n_1+ s_{X_2}^2 / n_2)^2}{(s_{X_1}^2/n_1)^2 / (n_1 - 1) + (s_{X_2}^2/n_2)^2 / (n_2 - 1)}$$
+where 
+$$s_{X_i}^2 = \frac{1}{n_i - 1} \sum_{j=1}^{n_i} (X_i^j - \bar{X_i})^2 $$
+for $i=1,2$.
+
+The hypothesis can then be written as:
+$$ \begin{aligned}
+H_0&: \mu_1 = \mu_2 \\
+H_1&: \mu_1 < \mu_2 \quad \text{,} \quad \mu_1 > \mu_2 \quad \text{,} \quad \mu_1 \neq \mu_2
+\end{aligned} $$
+
+These tests are implemented in the function `t.test()` in R.
+
+To run the test, we need to check the independence and normality assumptions of the $t$-test. Since we are considering two samples from two different countries (Croatia and Spain) we can assume their independence. To check the normality assumption we can make use of: a histogram plot, a Q-Q plot or the KS-test (the KS-test tests if a given sample comes from a queried distribution).
+
+```{r}
+hist(croatian_players$height_cm, 
+     breaks=seq(min(croatian_players$height_cm)-1,max(croatian_players$height_cm)+1,3),
+     main='Histogram of heights of Croatian players',
+     xlab='Height in cm')
+
+hist(spanish_players$height_cm, 
+     breaks=seq(min(spanish_players$height_cm)-1.5,max(spanish_players$height_cm)+1.5,3),
+     main='Histogram of heights of Spanish players',
+     xlab='Height in cm')
+```
+
+The bell-shaped curve in the histograms point to normally distributed data.
+We can also check the normality of the data using the Q-Q plot.
+
+```{r}
+qqnorm(croatian_players$height_cm, pch = 1, frame = FALSE,main='Croatian players')
+qqline(croatian_players$height_cm, col = "steelblue", lwd = 2)
+
+qqnorm(spanish_players$height_cm, pch = 1, frame = FALSE,main='Spanish players')
+qqline(spanish_players$height_cm, col = "steelblue", lwd = 2)
+```
+
+The sample quantiles seem to follow the theoretical quantiles of a normal distribution.
+
+Under the condition that our data now satisfies our assumptions, we can continue with the $t$-test to check if the Croatian players are taller than the Spanish ones.
+
+Which of the two tests mentioned above do we use? We need to analyze the variances of our samples.
+
+```{r}
+var(croatian_players$height_cm)
+var(spanish_players$height_cm)
+```
+
+Are the variances significantly different?
+
+### Testing the equality of two variances
+Let $X_1^1, X_1^2, \ldots X_1^{n_1}$ and $X_2^1, X_2^2, \ldots, X_2^{n_2}$ be two independent and random samples from the normal distribution with variances $\sigma_1^2$ and $\sigma_2^2$. Then, the random variable
+$$F = \frac{S_{X_1}^2 / \sigma_1^2}{S_{X_2}^2 / \sigma_2^2}$$
+
+follows a Fisher distribution with $(n_1 - 1, n_2 - 1)$ degrees of freedom, where:
+$$S_{X_1}^2 = \frac{1}{n_1 - 1} \sum_{i = 1}^{n_1} (X_1^i - \bar{X}_1)^2, \quad S_{X_2}^2 = \frac{1}{n_2 - 1} \sum_{i = 1}^{n_2} (X_2^i - \bar{X}_2)^2.$$
+The hypothesis of the test are:
+$$ \begin{aligned}
+H_0&: \sigma_1^2 = \sigma_2^2 \\
+H_1&: \sigma_1^2 < \sigma_2^2 \quad \text{,} \quad \sigma_1^2 > \sigma_2^2 \quad \text{,} \quad \sigma_1^2 \neq \sigma_2^2
+\end{aligned} $$
+
+This tests is implemented in the function `var.test()` in R.
+
+Let's test the variance equality of our Croatian and Spanish players.
+
+```{r}
+var.test(croatian_players$height_cm, spanish_players$height_cm)
+```
+
+Comparing the $p$-value of $0.2141$ with our significance level of 5%, we are not going to reject the $H_0$ hypothesis which states that the variances of the height of Croatian and Spanish players are the same.
+
+We can now run the $t$-test with the assumption of equal variances.
+
+```{r}
+# The order of samples in the function 't.test()' matters!
+t.test(croatian_players$height_cm, spanish_players$height_cm, alt = "greater", var.equal = TRUE)
+```
+
+Because of a very small $p$-value, we reject the $H_0$ hypothesis that states that the Croatian and Spanish players have equal heights on average. Therefore, we can say that the Croatian players are on average taller than the Spanish players.
+
+
+## Did the Spanish players improve from season 2019 to season 2020?
+
+As previously noted, our dataset contains the statistics of players from the year 2015 until the year 2020. We can use the data to check for any improvements of players from season to season. 
+We notice however, that the samples we would like to compare (Spanish players from 2019 and 2020) are comprised of the same data, since the same players are located in both the FIFA 2019 and FIFA 2020 dataset. This means that, if would like to compare the average quality of the players, we cannot use the the $t$-test, since the independence assumption would be violated.
+Therefore, we need a $t$-test that takes into consideration the data dependence between samples.
+
+## Paired data
+Let the tuple $(X_1^i, X_2^i)_{i=1}^n$ be a repeated measurement of $n$ different examples representing our two dependent samples and $D_i$ the random variable of their difference
+$$D_i = X_1^i - X_2^i$$.
+
+The random variables $X_1^i$ and $X_2^i$ are dependent:
+$$\sigma_D^2 = Var(D_i) = Var(X_1^i - X_2^i) = \sigma_1^2 + \sigma_2^2 - 2 Cov(X_1^i,X_2^i).$$
+
+If we denote with
+$$X_1^i = \mu_1 + \eta_1^i , \quad X_2^i = \mu_2 + \eta_2^i,$$
+we get 
+$$\sigma_D^2 = Var(\eta_1^i) + Var(\eta_2^i) - 2 Cov(\eta_1^i,\eta_2^i).$$
+The test statistics is then given as:
+$$T = \frac{\bar{D} - \mu_D}{S_d / \sqrt{n}}$$
+and the hypothesis are:
+$$\begin{aligned}H_0&: \mu_D = d_0 \\
+H_1&: \mu_D < d_0 \quad \text{,} \quad \mu_D > d_0 \quad \text{,} \quad \mu_d \neq d0
+\end{aligned}$$
+
+The $t$-test for the paired data is also implemented in the function `t.test()` by adding a parameter `paired=True`.
+
+
+Let's first load the 2020 data.
+
+```{r}
+fifa20 = read.csv("datasets/players_20.csv")
+dim(fifa20)
+```
+
+```{r}
+names(fifa20)
+```
+
+We merge the 2019 and 2020 data using the unique key for each player:
+
+```{r}
+merged_df = merge(fifa19, fifa20, by="sofifa_id", suffixes = c(".19",".20"))
+```
+
+To see if the players improved from 2019 to 2020, we can use the "overall score" variable that attributes an overall quality of each player in the given season.
+
+First, we check the data normality using the histograms and Q-Q plots:
+
+```{r}
+country = 'Spain'
+
+len = length(merged_df[merged_df$nationality.19 == country,]$overall.19 -  merged_df[merged_df$nationality.19 == country,]$overall.20)
+
+hist(merged_df[merged_df$nationality.19 == country,]$overall.19,
+     main=paste('Histogram of players from ',country,' in 2019 (',len,' players)'),
+     xlab='Overall score')
+
+hist(merged_df[merged_df$nationality.19 == country,]$overall.20,
+     main=paste('Histogram of players from ',country,' in 2020 (',len,' players)'),
+     xlab='Overall score')
+
+hist(merged_df[merged_df$nationality.19 == country,]$overall.19 - 
+       merged_df[merged_df$nationality.19 == country,]$overall.20,
+     main=paste('Histogram of players from ',country,' in 2019 - 2020 (',len,' players)'),
+     xlab='Difference of overall score')
+
+qqnorm(merged_df[merged_df$nationality.19 == country,]$overall.19 - merged_df[merged_df$nationality.19 == country,]$overall.20, 
+       pch = 1, 
+       frame = FALSE, 
+       main=paste('QQ-plot for overall score of players from',country,' (',len,'players)'))
+qqline(merged_df[merged_df$nationality.19 == country,]$overall.19 - merged_df[merged_df$nationality.19 == country,]$overall.20, 
+       col = "steelblue", lwd = 2)
+```
+
+The histograms of the differences of the variables suggest that the data follow a normal distribution, whereas the Q-Q plot suggest a slight deviation from the left tail.
+
+Under the assumption that the data follow a normal distribution, we use the paired $t$-test to answer our question about Spanish player improvements.
+
+```{r}
+t.test(merged_df[merged_df$nationality.19 == country,]$overall.19, 
+       merged_df[merged_df$nationality.19 == country,]$overall.20, 
+       paired = TRUE, 
+       alt = "less")
+```
+
+The very small $p$-value tells us that there is a statistically significant difference in the overall score of each Spanish player. This means that the players have indeed improved from 2019 to 2020.
+
+Even though testing our hypothesis concluded that the players have improved from 2019 to 2020, we can see that, on the scale from 0 to 100 of the overall quality variable, the players have improved about 0.68 on average.
+This is a big remark on inferring conclusions from statistical testing! Even though the test shows statistical significance, the conclusion is not necessarily practical (meaningful) in the real world.
+
+Let's for a moment imagine that we are in charge of the Spanish team, and have appointed a new very expensive football coach in the year 2020. We are interested to see if our investment has payed off; have the players improved? According to the test, the players have improved, but according to the difference in means, this improvement is meaningless.
+
+These kind of situations appear often when we have a big number of examples (bigger than here), so we always need to pay attention if the conclusion of a statistical test has real-world meaning.
+
+
+## Is the preferred kicking foot of each player independent of the player's position - on the left, right or in the middle of the field?
+
+R offers many packages to analyze and test categorical data. When analyzing categorical data, we can use the `factor` data type. Differently from a `character` data type, for a `factor` we can examine the possible categorical values using the `levels()` function.
+
+```{r}
+levels(factor(fifa19$preferred_foot))
+levels(factor(fifa19$team_position))
+```
+
+```{r}
+table(fifa19$preferred_foot)
+table(fifa19$team_position)
+```
+
+We can see that all the possible values are present in the dataset.
+
+We can join the player actual positions to see if they are located on the right, left or in the middle of the field. The player positions can be seen in the following image.
+
+```{r, fig.cap="Classification of the player position on the field as noted on the sofifa.com web page", out.width = '100%'}
+knitr::include_graphics("team_positions.png")
+```
+
+We'll copy the data so we preserve the original data.
+
+```{r}
+fifa19_copy = data.frame(fifa19)
+tracemem(fifa19)==tracemem(fifa19_copy)
+untracemem(fifa19_copy)
+untracemem(fifa19_copy)
+```
+
+We change the "team_position" variable to a character type so we can manipulate it more easily.
+
+```{r}
+fifa19_copy['team_position'] <- sapply(fifa19_copy['team_position'], as.character);
+```
+
+Let's create the right, left and central positions:
+
+```{r}
+# CREATING THE CENTRAL POSITIONS
+for (column_name in c("ST","CF","CAM","CM","CDM","CB")){
+  fifa19_copy$team_position[fifa19_copy$team_position == column_name] = "Central_positions";
+}
+
+# CREATING THE LEFT POSITIONS
+for (column_name in c("LS","LW","LF","LAM","LM","LCM", "LWB", "LDM", "LB", "LCB")){
+  fifa19_copy$team_position[fifa19_copy$team_position == column_name] = "Left_positions";
+}
+
+# CREATING THE RIGHT POSITIONS
+for (column_name in c("RS","RF","RW","RAM", "RCM","RM", "RDM", "RWB", "RCB", "RB")){
+  fifa19_copy$team_position[fifa19_copy$team_position == column_name] = "Right_positions";
+}
+```
+
+We can use the function `table()` to get the contingency table for a single categorical variable.
+
+```{r}
+tbl = table(fifa19_copy$team_position)
+print(tbl)
+```
+
+We remove the goalkeeper and substitute positions and check the joint contingency table for the position and preferred kicking foot variables.
+
+```{r}
+tbl = table(fifa19_copy[fifa19_copy$team_position == "Central_positions" | fifa19_copy$team_position == "Left_positions" | fifa19_copy$team_position == "Right_positions",]$team_position, 
+            fifa19_copy[fifa19_copy$team_position == "Central_positions" | fifa19_copy$team_position == "Left_positions" | fifa19_copy$team_position == "Right_positions",]$preferred_foot)
+tbl
+```
+
+Let's add the row and column sums to the contingency tables.
+
+```{r}
+added_margins_tbl = addmargins(tbl)
+print(added_margins_tbl)
+```
+
+The $\chi^2$ test of independence is implemented in the `chisq.test()` function in R. The function takes a contingency table as its argument and tests the independence of the given variables.
+
+The assumptions of the test is that the expected frequency of each class (category) is at least 5 (the `chisq.test()` function assumes this assumptions is satisfied, so we need to check it before running the test).
+
+```{r}
+for (col_names in colnames(added_margins_tbl)){
+  for (row_names in rownames(added_margins_tbl)){
+    if (!(row_names == 'Sum' | col_names == 'Sum') ){
+      cat('Expected frequencies for class (category) ',col_names,'-',row_names,': ',(added_margins_tbl[row_names,'Sum'] * added_margins_tbl['Sum',col_names]) / added_margins_tbl['Sum','Sum'],'\n')
+    }
+  }
+}
+```
+
+Since all the expected frequencies are bigger than 5, we can continue with the $\chi^2$ test and check if the position of a player is independent of its preferred kicking foot.
+
+```{r}
+chisq.test(tbl,correct=F)
+```
+
+We reject the $H_0$ hypothesis in favor of $H_1$ that states that the position of the player on the field is independent of its preferred kicking foot.
+
+
+There are several other interesting questions that you can further explore:
+
+1. Is the position of the player on the field independent of its physical type?
+2. Are defenders better in controlling the ball ("skill_ball_control") than the attackers?
+3. Are defenders better dribblers ("dribbling") than attackers?
+
+

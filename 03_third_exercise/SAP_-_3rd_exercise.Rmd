@@ -1,0 +1,371 @@
+---
+title: "SAP - Treća auditorna vježba"
+author: "Stjepan Begušić, David Bojanić, Andro Merćep, Tessa Bauman, Tomislav Kovačević"
+date: "15.12.2021."
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+  word_document: default
+subtitle: 'Case study *bike sharing data*: Linear regression'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Linear regression
+
+Linear regression is useful in various research and practical situations, and it provides answers to several important questions:
+
+- Is there a connection between the input variable (or several input variables) - the regressor, and the output variable (reaction)?
+- How strong is that connection?
+- Which input variables have the greatest influence on the output variable and how strong is that effect?
+- Can we predict the output for some new input variable values and with what accuracy?
+
+### Linear regression model and parameter estimation
+
+A linear regression model assumes a linear relationship between input and output variables: $$Y = \beta_0 + \sum_{j = 1}^{p}\beta_jx_j + \epsilon$$ 
+Model assumptions:
+
+-   linearity of $X$ and $Y$ relationship
+-   independent, homogeneous and normally distributed errors with $\epsilon \sim \mathcal{N}(0,\sigma^2)$
+
+It is possible to obtain an estimate of the model from the data: $$\hat{Y} = b_0 + \sum_{j = 1}^{p}b_jx_j + e,$$ or: $$\hat{\mathbf{y}} = \mathbf{X} \mathbf{b} + \mathbf{e}$$ in matrix notation.
+
+The assessment is based on the method of least squares, i.e. minimization of "sum of squared errors": $$SSE = \sum_{i = 1}^{N}(y_i - \hat{y}_i)^2 = (\mathbf{y}-\mathbf{X}\mathbf{b})^T(\mathbf{y}-\mathbf{X}\mathbf{b})$$ By deriving: $$\mathbf{b} = (\mathbf{X}^T\mathbf{X})^{-1}\mathbf{X}^T\mathbf{y}$$ In order to solve this equation, it is necessary to invert the matrix $\mathbf{X}^T\mathbf{X} \in \mathrm{R}^{p\times p}$ (complexity of $O(n^3)$), assuming the matrix being \textbf{fully ranked}.
+
+Linear regression parameter estimation in R, as well as statistical tests related to the parameters and the estimated model are available in the `lm` function in the `stats` package.
+
+## Bike sharing data
+
+The data for the analysis is given in the file `bike.sharing`, and contains information about weather conditions and the number of bikes rented by a certain bike-sharing agency that day. The data set is available at: <https://archive.ics.uci.edu/ml/datasets/Bike+Sharing+Dataset> - as well as a list of variables.
+
+```{r data}
+bike.sharing.data = read.table('bikesharing.csv',header = T,sep = ",")
+summary(bike.sharing.data)
+bike.sharing.data$dteday <- as.Date(bike.sharing.data$dteday,format("%Y-%m-%d")) # datetime formatting
+```
+
+In order to be able to predict the need for bicycles, we can examine different variables that could affect the number of bicycles rented:
+
+- Average temperature
+- Humidity
+- Wind speed
+
+When we observe the influence of only one independent variable X on some dependent variable Y, it is possible to graphically get a very good impression of their relationship - this is where a scatter plot is often very helpful.
+
+```{r scatter plots}
+
+plot(bike.sharing.data$temp,bike.sharing.data$cnt) #average temp vs number of rented bicycles
+
+plot(bike.sharing.data$atemp,bike.sharing.data$cnt) #average temp impression vs number of rented bicycles
+
+plot(bike.sharing.data$hum,bike.sharing.data$cnt) #average humidity vs number of rented bicycles
+
+plot(bike.sharing.data$windspeed,bike.sharing.data$cnt) #average wind speed vs number of rented bicycles
+
+```
+
+
+It is obvious that the temperature (both the average daily temperature and the impression of temperature) has a strong (and positive) influence on the output variable. On the other hand - humidity and wind speed seem to be much weaker candidates for modeling the number of rented bicycles (with some indications of a negative influence).
+
+In order to examine the individual influence of these variables, we will estimate a simple regression model - one for each independent variable (with cnt - the number of rented bicycles - as a dependent variable).
+
+The regression model is estimated with the lm() function, which receives dependent and independent variables as parameters, that is, data.frame with all variables and the definition of the variables in the model.
+
+```{r simple regression}
+
+fit.temp = lm(cnt~temp,data=bike.sharing.data) #linear model of the number of rented bicycles (cnt) and temperature (temp)
+
+fit.atemp = lm(cnt~atemp,data=bike.sharing.data) #linear model of the number of rented bicycles (cnt) and temperature impression (atemp)
+
+fit.hum = lm(cnt~hum,data=bike.sharing.data) #linear model of the number of rented bicycles (cnt) and humidity (hum)
+
+fit.windspeed = lm(cnt~windspeed,data=bike.sharing.data) #linear model of the number of rented bicycles (cnt) and wind speed (windspeed)
+
+
+plot(bike.sharing.data$temp,bike.sharing.data$cnt) #graphic data display
+lines(bike.sharing.data$temp,fit.temp$fitted.values,col='red') #graphic representation of estimated values from the model
+
+plot(bike.sharing.data$atemp,bike.sharing.data$cnt) #graphic data display
+lines(bike.sharing.data$atemp,fit.atemp$fitted.values,col='red') #graphic representation of estimated values from the model
+
+plot(bike.sharing.data$windspeed,bike.sharing.data$cnt) #graphic data display
+lines(bike.sharing.data$windspeed,fit.windspeed$fitted.values,col='red') #graphic representation of estimated values from the model
+
+plot(bike.sharing.data$hum,bike.sharing.data$cnt) #graphic data display
+lines(bike.sharing.data$hum,fit.hum$fitted.values,col='red') #graphic representation of estimated values from the model
+
+```
+
+The slopes of the linear regression lines confirm the claims about the effects of individual considered variables on the output variable. In order to analyze and compare the obtained models, it is first necessary to check that the assumptions of the model are not (heavily) violated. In doing so, the most important assumptions are about the regressors (in multivariate regression, the regressors must not be strongly correlated with each other) and about the residuals (normality of the residuals and homogeneity of the variance).
+
+### Normality of the residuals and homogeneity of the variance
+
+The normality of the residuals can be checked graphically, using a quantile-quantile plot (by comparison with the normal distribution line), and statistically using the Kolmogorov-Smirnov test.
+
+```{r res}
+
+selected.model = fit.temp
+
+plot(selected.model$residuals) #looking at the residuals this way, it is difficult to evaluate normality
+
+#histogram is very interpretive
+hist((selected.model$residuals))
+hist(rstandard(selected.model))
+
+#q-q plot of residuals with a normal distribution line
+qqnorm(rstandard(selected.model))
+qqline(rstandard(selected.model))
+
+plot(selected.model$fitted.values,selected.model$residuals) #it is good to show the residuals in dependence on the model estimates
+
+plot(bike.sharing.data$dteday,selected.model$residuals) #and sometimes depending on some other variables that may be difficult to model as independent variables with a linear effect on the output - in this case the date
+
+#KS normality test
+ks.test(rstandard(fit.windspeed),'pnorm')
+
+require(nortest)
+lillie.test(rstandard(fit.windspeed))
+
+```
+
+-   Graphical representation of residuals only by the index by which they are given in the data can rarely give a complete picture of their nature - admittedly, in this case the data are arranged chronologically, so that graphic representation also corresponds to the one by dates - which testifies to a certain temporal dependence of the data.
+
+- A histogram is a very easy-to-read and interpretable way of displaying such variables, and it is easy to conclude something about the general shape of the distribution of the residuals - in this case, this distribution somewhat resembles a normal one (which is roughly shown by the q-q plot), and is not too curved.
+
+- It is also very important that, depending on the predictions of the model, the residuals themselves do not show heterogeneity of variance (they do not "spread" with increasing $\hat{y}$). However, depending on the date, there is a certain dynamic of the residuals (they do not "look" completely random) that the model does not explain. Such time dependencies are most often modeled by the so-called autoregressive models (ARMA, ARIMA, ARIMAX, etc.) which are not the subject of this course.
+
+- Statistical tests differ in results (although the use of the Lilliefors correction is recommended, in practice the K-S test and other versions are still often used). However, since the residuals do not show too much deviation from normality (in terms of curvature or other differences in the distribution) and it is known that the t-test is robust to (non)normality - in data analysis, in such cases, statistical conclusions can still be drawn from regression models.
+
+## Assessment of model quality and statistical inference about the estimated model
+
+If the assumptions of the model are not (unacceptably) violated, it is possible to apply different statistical tests on the estimated coefficients and the model.
+
+#### t-test of model coefficients
+
+Since $B_i\sim N(\mu_{B_i},\sigma_{B_i})$, $\mu_{B_i} = \beta_i$, the statistic $$T = \frac{B_i - \beta_i}{SE(B_i)}$$ has a $t$-distribution with $n-k-1$ degrees of freedom, where $k$ is the number of parameters. Most software packages, including R, automatically test $\beta_i = 0$ when estimating linear regression coefficients. Those coefficients for which we can reject $H_0: \beta_i = 0$ in favor of $H_1: \beta_i \neq 0$ are called \textbf{significant coefficients}.
+
+### Measures of model quality of model fit to data
+
+#### SSE
+
+The measure that we minimize by estimating the model parameters ("fitting to the data") is SSE: $$SSE = \sum_{i = 1}^{N}(y_i - \hat{y}_i)^2$$
+
+#### $\mathbf{R^2}$
+
+A very common measure of the quality of model adaptation is the coefficient of determination, defined as: $$R^2 = 1 - \frac{SSE}{SST},$$ where: $SST = \sum_{i = 1}^{N}(y_i - \bar{y}_i)^2$ represents "total corrected sum of squares". The coefficient of determination $R^2$ is for linear models by definition $R^2 \in [0,1]$ and describes what percentage of the variance in the output variable $Y$ is explained/described by the estimated linear model.
+
+#### Adjusted $\mathbf{R^2}$
+
+The adjusted coefficient of determination penalizes additional parameters in the model: $$R_{adj}^2 = 1 - \frac{SSE/(n-k-1)}{SST/(n-1)}.$$
+
+### F-test
+
+The F-statistic is used to test the significance of the entire model: $$ f = \frac{SSR/k}{SSE/(n-k-1)}, $$ where $SSR = \sum_{i=1}^n(\hat{y}_i-\bar{y})^2$.
+
+All measures listed here can be seen by calling the summary() function on the object returned by lm().
+
+```{r analysis of estimated models}
+
+summary(fit.temp)
+
+summary(fit.atemp)
+
+summary(fit.hum)
+
+summary(fit.windspeed)
+
+```
+
+As seen from the initial graphical representations, temperature as a variable has a very strong effect on the number of rented bicycles and explains the largest percentage of the variance (which is reflected in the highest values of $R^2$). Also, although not all models are of equal quality, in all cases the coefficients with the dependent variable are significant, and the F-tests indicate that all models are significant (they explain significantly more variance than the null model). Obviously, even the variables hum and windspeed are not redundant in modeling the number of rented bicycles, although perhaps their value is somewhat smaller than temp or atemp.
+
+## Correlation coefficient and connection with the linear model
+
+The correlation coefficient is a very frequently used concept based on linear regression, and describes the direction and nature of the relationship between two variables. Pearson's correlation coefficient is defined as:
+
+$$r = \frac{S_{xy}}{\sqrt{S_{xx}S_{yy}}},$$
+
+where $S_{xx} = \sum(x_i-\bar{x})^2$,$S_{yy} = \sum(y_i-\bar{y})^2$, and $S_{xy} = \sum(x_i-\bar{x})(y_i-\bar{y})$.
+
+The correlation coefficient is directly determined by linear regression and the coefficient of determination $R^2$ and equals to $r = \sqrt{R^2}$.
+
+```{r correlation coefficient}
+
+cor(bike.sharing.data$hum,bike.sharing.data$cnt)
+
+cor.test(bike.sharing.data$hum,bike.sharing.data$cnt)
+
+summary(fit.hum)
+
+```
+
+## Multiple regression
+
+Before estimating the multiple regression model, it is necessary to check that individual pairs of variables are not (too) correlated. In principle, some correlation between variables is inevitable, but variables with a very high correlation will cause problems in the interpretation of regression results.
+
+```{r multiple regression with correlated variables}
+
+fit.temps = lm(cnt ~ atemp + temp, bike.sharing.data) #regression with highly correlated variables
+summary(fit.temps)
+
+cor(bike.sharing.data$temp,bike.sharing.data$atemp)
+
+```
+
+Regression with highly correlated input variables will generally give some results, but we cannot draw any conclusions based on them. In the case of perfect linear dependence or correlation of the input variables, the estimation of the regression model will be unstable and at least one coefficient will be NA.
+
+Therefore, it is necessary to select that subset of variables that we believe explain different effects in the data and are not (too) correlated with each other.
+
+```{r cor}
+
+cor(cbind(bike.sharing.data$temp,bike.sharing.data$atemp,bike.sharing.data$hum,bike.sharing.data$windspeed)) # correlation coefficients of regressor pairs
+
+```
+
+```{r multiple regression}
+fit.multi = lm(cnt ~ atemp + hum + windspeed, bike.sharing.data)
+summary(fit.multi)
+
+
+```
+
+```{r residuals - multiple regression}
+plot(selected.model$fitted.values,selected.model$residuals) #residuals depending on model estimates
+
+plot(bike.sharing.data$dteday,selected.model$residuals) #residuals depending on the date
+
+#KS normality test
+ks.test(rstandard(fit.windspeed),'pnorm')
+
+#Lillieforsov normality test
+require(nortest)
+lillie.test(rstandard(fit.windspeed))
+
+```
+
+Why are the variables hum and windspeed so much more "significant" than when we use them alone? Often the opposite happens - by including additional variables, certain variables can "cease" to be significant. In multiple regression, the interaction (correlation) of variables with each other and with the dependent variable comes to the fore - different interpretations are possible. It can be argued that the inclusion of the temp variable additionally "cleaned" the residuals of the model in which only hum or windspeed would be used, and thus part of the variance explained by these two variables came to the fore. If temp and hum or windspeed explained the same effects in the data, we would expect that including temp would cause hum or windspeed to "cease" to be significant.
+
+These interactions are the cause of various phenomena in statistics, and one of the more famous is Simpson's paradox (<https://en.wikipedia.org/wiki/Simpson%27s_paradox>).
+
+The multiple regression model we obtained in this way explains approx. $46\%$ variance in the data - in general it is difficult to say how much $R^2$ is "enough" for what kind of data since it mostly depends on the field of application - for various social and economic studies (anything related to human behavior) already $30\%$ will be a satisfactory result, while for some physical processes even $80\%$ is not a good enough model. In the specific case, since it is still about something related to human behavior, this result seems good, but as can be seen in the analysis of the residuals (graphical representation in relation to the output of the model and in relation to the date) - there are some other effects in the data which this model fails to explain.
+
+## Categorical independent variables
+
+In the data set, we have some categorical variables, for example season (season), mnth (month), holiday (indicator of whether that day is a holiday), weekday (day of the week), weathersit (weather situation). Categorical variables can be included as regressors in the analysis, but several things need to be checked first:
+
+- whether it is a variable on a nominal or ordinal scale,
+- does the variable have a linear effect on the output variable,
+- whether a certain categorical variable represents something that is already represented by a certain metric variable.
+
+In the specific case, the variable season is only a variable with a slightly coarser granularity than the variable mnth, and for both we would expect them to explain a similar effect in the data as the variable temp. The holiday and weathersit variables could be useful and interesting.
+
+Using categorical variables with more than two categories as int values in regression is not recommended for nominal variables, although they may appear useful in models in this form.
+
+```{r categorical input variables - raw}
+
+boxplot(cnt~season,data=bike.sharing.data) #boxplots can be used to graphically check the linearity of the effect of a categorical variable on some output variable
+
+fit.multi.1 = lm(cnt ~ atemp + hum + windspeed + season, bike.sharing.data)
+summary(fit.multi.1)
+
+```
+
+The results indicate that the season variable presented in this way is significant in the model, but the model very likely only captured the effect of very small output values for winter (season = 1) and cannot explain the effect of reduced values for autumn (season = 4) compared to spring and summer.
+
+There are various techniques for representing categorical variables as input to a regression model, and one of the simplest and most commonly used is the so-called dummy variables. Each category in a categorical variable is represented by its own indicator variable that takes the value 1 if the original categorical variable takes the value of that category, and 0 otherwise. Simple generation of dummy variables is available in the fastDummies package.
+
+```{r categorical input variables - dummy variables}
+
+require(fastDummies)
+bike.sharing.data.d = dummy_cols(bike.sharing.data,select_columns='season')
+
+#dummy variable model estimation
+fit.multi.d = lm(cnt ~ atemp + hum + windspeed + holiday + season_1 + season_2 + season_3, bike.sharing.data.d)
+summary(fit.multi.d)
+
+```
+
+Dummy variables will always be linearly dependent if we use them all in regression models (explanation: if we know that the value of a categorical variable is not one of the 3 categories, then we know for sure that it is the 4th category) - therefore it is always necessary to exclude one of the dummy variables from model. Regardless of which variables we include, the overall model will be the same, but only inferences about individual dummy variables in cases where we have more than two categories will be somewhat more complicated.
+
+## Time dependent variables
+
+In some cases, we know that the output variable also has a pronounced time dependence - in this particular case, we can be sure that if we know today's number of rented bicycles, there is little probability that tomorrow's will be too different, even when we model the effects of weather, temperature, etc. That is after all, it is also visible in the graphical representations of the residuals in dependence on the date for the above models.
+
+There is a simple way in which some of these time effects can be modeled without using more complex models - by including as an input variable in the regression a time-shifted output variable representing the "past" that is mostly known at the time of modeling. Specifically, in addition to all the mentioned variables, to model the variable cnt at time $t$ we can also include the variable cnt itself at time $t-1$.
+
+```{r time shift in the dependent variable}
+
+#time shift of cnt variable
+bike.sharing.data.d$lag.cnt = c(NA,bike.sharing.data.d$cnt[1:length(bike.sharing.data.d$cnt)-1])
+
+#model estimation with a time-shifted cnt variable at the input
+fit.multi.d.timelag = lm(cnt ~ lag.cnt + atemp + hum + windspeed + holiday + season_1 + season_2 + season_3, bike.sharing.data.d)
+summary(fit.multi.d.timelag)
+
+plot(bike.sharing.data.d$dteday[2:length(bike.sharing.data.d$dteday)],fit.multi.d.timelag$residuals) #reziduali u ovisnosti o datumu
+
+
+```
+
+## Data transformations, adding interaction members
+
+In some situations, in order to build a better model, it is desirable to apply transformations on the input or output variables, usually $f(x) = \log x$ or $f(x) = e^x$. It is also possible to add the so-called interaction members or squares, cubes, ...etc. of input variables, e.g. $x_1^2$, $x_1x_2$, $x_2^2$.
+
+In both cases, modifications are applied based on assumptions about the nature of the interaction and the model. Using the example of temperature, in one of the first graphs you could see a potentially non-linear effect of temperature - at the highest temperatures, the number of rented bikes was still decreasing (which makes sense).
+
+```{r transformation}
+
+# it is possible to check the above-mentioned statement first on the example of only temperature
+fit.atemp.sq = lm(cnt ~ atemp + I(atemp^2),bike.sharing.data.d)
+summary(fit.atemp.sq)
+
+#a simple way to graphically display non-linear curves
+f = function(x, coeffs)
+  return(coeffs[[1]] + coeffs[[2]] * x + coeffs[[3]] * x^2)
+plot(bike.sharing.data$atemp,bike.sharing.data$cnt) 
+curve(f(x, fit.atemp.sq$coefficients), add = TRUE, col = "red")
+
+```
+
+By including the variables transformed in this way, it is possible to further improve the overall multiple regression model.
+
+```{r model s transformacijom}
+
+#regression model with all variables
+fit.multi.d.timelag.sq = lm(cnt ~ lag.cnt + atemp + I(atemp^2) + hum + windspeed + holiday + season_1 + season_2 + season_3, bike.sharing.data.d)
+summary(fit.multi.d.timelag.sq)
+
+```
+
+## Selection of model parameters
+
+In choosing the final model that you would recommend to a bike rental company, it is necessary to be guided by the principle of simplicity - a simpler model is generally preferred if it is as good as an alternative more complex model. Since models with more variables will generally always explain a larger proportion of the variance than models with a smaller subset of the same variables, it is not possible to compare models with different numbers of variables by looking only at their errors.
+
+When choosing a model in relation to a large number of considered variables, it is possible to use different techniques (so-called model selection) that are not part of this course. However, as one of the simpler tools for comparing models with different numbers of parameters, it is also possible to use the adjusted coefficient of determination $R_{adj}^2$, which penalizes additional parameters in the model.
+
+In this case, the holiday variable is potentially not that useful in the model and may be dropped.
+
+```{r reducing the number of parameters}
+
+#model including variable holiday 
+fit.multi.d.timelag.sq = lm(cnt ~ lag.cnt + atemp + I(atemp^2) + hum + windspeed + holiday + +season_1 + season_2 + season_3, bike.sharing.data.d)
+summary(fit.multi.d.timelag.sq)
+
+#model without variable holiday
+fit.multi.d.timelag.sq.final = lm(cnt ~ lag.cnt + atemp + I(atemp^2) + hum + windspeed + season_1 + season_2 + season_3, bike.sharing.data.d)
+summary(fit.multi.d.timelag.sq.final)
+
+
+```
+
+The results indicate that the holiday variable still provides some useful information in the model, even when we use $R_{adj}^2$.
+
+Another frequently used method is to simply throw out those regressors that do not have significant coefficients - but due to interactions between regressors in multivariate regression, this is not always a reliable method. Also, in the case of a very large number of variables, problems of repeated comparisons (multiple testing) may arise.
+
+## Conclusion
+
+The final model contains relevant variables that explain around $80\%$ of the variance in the number of rented bicycles per day. In addition to the metric variables of air temperature, humidity and wind, the square of the air temperature (due to the non-linear effect), a categorical variable indicating holidays, dummy variables for the weather situation category, and the previous ("yesterday") value of the number of rented bicycles are also included.
+
+All the mentioned variables except holiday are significant at the 0.01 level, as is the model itself, as indicated by the results of the t-tests of individual coefficients and the F-test of the entire model.

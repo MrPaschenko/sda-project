@@ -1,0 +1,379 @@
+---
+title: "SAP - Fourth auditory exercise"
+subtitle: "Case study *Properties of bank's clients*: ANOVA and logistic regression"
+author: "Tessa Bauman, Stjepan Begušić, David Bojanić, Krunoslav Jurčić, Tomislav Kovačević, Andro Merćep"
+output: pdf_document
+---
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Bank's retail credit data
+
+The dataset contains the data on retail credits of a bank.
+
+```{r data}
+# Read CSV file
+creditdata = read.csv('creditdata.csv')
+summary(creditdata)
+```
+
+Each row represents the data of one client; the variables include:
+
+- education -- client's education (1 -- elementary school, 2 -- high school, 3 -- university or higher education)
+- marriage -- marital status (1 -- unmarried, 2 -- married)
+- apartment -- apartment ownership status (1 -- renting, 2 -- homeowner)
+- income -- average monthly income
+- amount -- loan amount
+- default -- was the client late on repayment of their loan? (0 -- no, 1 -- yes)
+
+
+```{r data preprocessing}
+# Data preprocessing
+creditdata$education = factor(creditdata$education,levels = c(1,2,3),labels = c('elementary','secondary','university'))
+creditdata$marriage = factor(creditdata$marriage,levels = c(1,2),labels = c('single','married'))
+creditdata$apartment = factor(creditdata$apartment,levels = c(1,2),labels = c('rent','own'))
+creditdata$default = factor(creditdata$default,levels = c(0,1),labels = c(FALSE,TRUE))
+summary(creditdata)
+```
+
+Some of the key questions that banks and credit institutions want to know are:
+
+- How does the client's income change with their other features (e.g. education level)?
+- Are there any interaction effects between several client features that define their income?
+- Can we predict whether a client will default on their loan using their other variables?
+
+
+# ANOVA
+
+ANOVA (*ANalysis Of VAriance*) is a method used to analyze the difference between means of multiple populations. When using ANOVA we assume that the total variance in the data is driven by the variance within each individual group (i.e. population) as well as the variance between different groups. The variance within each individual sample is random, and any differences between population means will impact the variance between groups. One of the main goals will be to find out if those differences between groups are a random effect or if they are statistically significant.
+
+
+## One-way ANOVA
+
+In one-way ANOVA model we consider the impact of a single factor with $k$ levels (often called *treatments*). Let
+$$ \begin{aligned}
+  X_{11}, X_{12}, \ldots, X_{1n_1} & \sim N(\mu_1, \sigma^2) \\
+  X_{21}, X_{22}, \ldots, X_{2n_2} & \sim N(\mu_2, \sigma^2) \\
+  & \vdots\\
+  X_{k1}, X_{k2}, \ldots, X_{kn_k} & \sim N(\mu_k, \sigma^2)
+\end{aligned} $$
+be the independent samples of $k$ different populations (that have different levels of the target factor). One-way ANOVA model is defined as:
+$$ X_{ij} = \mu_{i} + \epsilon_{ij}, $$
+where $\mu_{j}$ denotes the population mean with $i = 1,..,k$. Using ANOVA we test:
+$$ \begin{aligned}
+  H_0 & : \mu_1 = \mu_2 = \ldots = \mu_k \\
+  H_1 & : \text{at least two means are not equal}.
+\end{aligned} $$
+
+We can rewrite the one-way model as
+$$ X_{ij} = \mu + \alpha_i + \epsilon_{ij}, $$
+where $\mu$ denotes the mean of all $\mu_i$
+$$ \mu = \frac{1}{k} \sum_{i=1}^k \mu_i, $$
+and $\alpha_i$ is called the effect of the $i$-th treatment. The equivalent hypothesis is now:
+$$ \begin{aligned}
+  H_0 & : \alpha_1 = \alpha_2 = \ldots = \alpha_k = 0 \\
+  H_1 & : \text{at least one $\alpha_i$ is not equal to 0.}
+\end{aligned} $$
+
+We will consider the following measures of variability of the data:
+$$ \begin{aligned}
+SST &= \sum_{i=1}^k \sum_{j=1}^n (x_{ij} - \bar{x}_{..})^2 = \text{total variation} \\
+SSA &= n \sum_{i=1}^k (\bar{x}_{i.} - \bar{x}_{..})^2 = \text{between-treatment variation} \\
+SSE &= \sum_{i=1}^k \sum_{j=1}^n (x_{ij} - \bar{x}_{i.})^2 = \text{within-treatment variation}
+\end{aligned}$$
+
+Using $s_1^2 = \dfrac{SSA}{k - 1}$, we have
+$$ \mathbb{E} [s_1^2] = \sigma^2 + \frac{n}{k-1} \sum_{i=1}^k \alpha_i^2.$$
+If $H_0$ is true, we can see that $s_1^2$ is an unbiased estimate of $\sigma^2$. Additionaly, we have $s^2 = \dfrac{SSE}{k(n-1)}$ and $\mathbb{E}[s^2] = \sigma^2$, so the test statistic is:
+$$ f = \frac{s_1^2}{s^2} \overset{H_0}{\sim} f[k-1, k(n-1)].  $$
+
+ANOVA makes the following assumptions:
+
+- independence of observations,
+- normality,
+- homogeneity (or equality) of variances of populations. 
+
+If the group sizes are approximately equal, ANOVA is relatively robust to small violations of the assumptions of normality and homogeneity. However, it is recommended to check the magnitude of those violations.
+
+We can check the normality of each group can be assessed using KS test of Lilliefors variant of KS test. In this case we will consider the employment as a variable that will define our populations, and the income will be the dependent variable.
+
+```{r testing of assumptions - normality}
+
+require(nortest)
+lillie.test(creditdata$income)
+
+lillie.test(creditdata$income[creditdata$education=='elementary'])
+lillie.test(creditdata$income[creditdata$education=='secondary'])
+lillie.test(creditdata$income[creditdata$education=='university'])
+
+hist(creditdata$income[creditdata$education=='elementary'])
+hist(creditdata$income[creditdata$education=='secondary'])
+hist(creditdata$income[creditdata$education=='university'])
+
+```
+
+The homogeneity assumption can be tested using the following hypothesis:
+$$ \begin{aligned}
+  H_0 & : \sigma_1^2 = \sigma_2^2 = \ldots = \sigma_k^2 \\
+  H_1 & : \text{at least two variances are not equal}.
+\end{aligned} $$
+We can do that by using the Bartlett's test, which is implemented in R via `bartlett.test()` function.
+
+```{r testing of assumptions - homogeneity}
+
+# Testiranje homogenosti varijance uzoraka Bartlettovim testom
+bartlett.test(creditdata$income ~ creditdata$education)
+
+var((creditdata$income[creditdata$education=='elementary']))
+var((creditdata$income[creditdata$education=='secondary']))
+var((creditdata$income[creditdata$education=='university']))
+```
+
+Let's check if there are any differences in income based on clients' education.
+
+```{r testing of the difference in income}
+
+# Graficki prikaz podataka
+boxplot(creditdata$income ~ creditdata$education)
+
+# Test
+a = aov(creditdata$income ~ creditdata$education)
+summary(a)
+```
+
+The boxplot suggests that there is a clear difference between groups - a conclusion that is also confirmed by ANOVA.  How can we estimate the model that explains clients' income using their education?
+
+```{r linear model}
+
+# Linearni model
+model = lm(income ~ education, data = creditdata)
+summary(model)
+anova(model)
+```
+
+A linear model that uses only the categorical variable of a group (population) as a predictor is equivalent to the ANOVA model -- conclusions are the same for both of them.
+
+
+## Two-factor Analysis of Variance
+
+As the name suggests, two-factor ANOVA considers the impact of two factors, where the first one has $a$ levels, and the other one has $b$ levels. In other words, we are considering $a \cdot b$ populations. Assuming we independently sample $n$ observations for each population, one per characteristic $X$ represented as $X_{ij} \sim N(\mu_{ij}, \sigma^2)$ in population $ij$, where $i \in \{1, 2, \ldots, a\}$ and $j \in \{1, 2, \ldots, b\}$.
+
+
+The three hypotheses to be tested are:
+
+- $H_0'$: the first factor is insignificant
+- $H_0''$: the second factor is insignificant
+- $H_0'''$: there is no interaction between factors.
+
+We can test all three hypotheses using two-factor ANOVA model:
+$$ X_{ijk} = \mu_{ij} + \epsilon_{ijk}, $$
+where we can rewrite the means $\mu_{ij}$ as $\mu_{ij} = \mu + \alpha_i + \beta_j + (\alpha\beta)_{ij}$, where $\alpha_i$ denotes the mean of the first factor, $\beta_i$ is the mean of the second one, and $(\alpha\beta)_{ij}$ are the interaction terms. Two-factor ANOVA makes the same assumptions as the one-way test, with an additional constraint that the group (population) sample sizes must be the same. However, this is rarely the case, which is why we use the variant with weighted means -- it is implemented in the R function `aov()`.
+
+```{r two-factor anova - assumptions plot and testing}
+
+# Boxplot
+boxplot(creditdata$income ~ creditdata$education) 
+boxplot(creditdata$income ~ creditdata$marriage) 
+
+inter = interaction(creditdata$education,creditdata$marriage)
+boxplot(creditdata$income ~ inter,cex.axis=0.5)
+
+# Bartlett's test of equality of variances
+bartlett.test(creditdata$income ~ inter)
+aggregate(creditdata$income, by=list(inter), FUN=var)
+```
+
+```{r two-factor anova - test}
+
+# Two-factor ANOVA test
+a = aov(income ~ education * marriage, data = creditdata)
+summary(a)
+```
+
+
+```{r two-factor anova - linear model}
+
+# Linear model
+model = lm(income ~ education * marriage, data = creditdata)
+summary(model)
+anova(model)
+```
+
+The results suggest that there is no interaction, but that the income of individual populations is different (when considered in terms of education level or marital status). Moreover, using the output of the linear model allows us to conclude which groups have higher expected income.
+
+```{r}
+interaction.plot(x.factor = creditdata$education,
+                 trace.factor = creditdata$marriage,
+                 response = creditdata$income,
+                 fun = mean,
+                 type = "b",
+                 ylab = "Mean",
+                 xlab = "Education",
+                 col = c("red", "blue"),
+                 lty = 1,
+                 trace.label = "Marriage")
+```
+
+
+
+# Logistic regression
+
+If we wanted to use the existing data to predict whether a client will default on their loan or not, it would be possible to estimate a regression model using the client data as independent variables. The dependent variable is not continuous in this case. Which assumptions of linear regression are (severely) violated in this scenario?
+
+We have a dataset $D = \{{X_1}, ..., {X_N}\}$ where each ${X_i}$ denotes a vector of predictor variables that can either be discrete (with appropriate dummy-encoding) or continuous. We also have a set of expected outputs $\{y_1, ..., y_n\}$ where each $y_i$ is a binary variable, i.e. 0 or 1. We want a model with corresponding outputs $\{\hat{y_1}, ..., \hat{y_N}\}$, ideally with $\hat{y_i} = y_i$ as often as possible. In other words, we want a model that makes good predictions. Furthermore, we want a probability $P(\hat{Y_i} = 1 | {x_i})$ that would provide us with a measure of model's "certainty" in its conclusion. We could use that probability to obtain the binary output via:
+$$ \hat{y_i} = 
+\begin{cases}
+    1 & \text{if } P(\hat{Y_i} = 1 | \vec{x_i})\geq 0.5\\
+    0,              & \text{otherwise}
+\end{cases} $$
+
+The main issue with using linear regression for this problem is that the output ${\beta}^T{X}$ can have a value outside the interval $[0, 1]$. In other words, the linear regression model does not fulfill our requirements as its output cannot be interpreted as a probability.
+
+Logistic regression addresses this problem by transforming ${\beta}^T{X} using the logistic (sigmoid) function:
+$$ \sigma(\alpha) =  \frac{1}{1 + e^{-\alpha}} $$
+which is shown in the following plot:
+```{r}
+sigmoid = function(x) {
+   1 / (1 + exp(-x))
+}
+
+x <- seq(-5, 5, 0.01)
+
+plot(x,sigmoid(x))
+```
+
+There are several reasons why we chose this function:
+
+1. The function output is between 0 and 1.
+2. Its derivative is $\sigma'(\alpha) = \sigma(\alpha)(1 - \sigma(\alpha))$, which simplifies the learning process.
+3. Coefficients $\beta$ can be easily interpreted (we will consider this later).
+
+The probabilistic output of the model is equal to:
+$$ P(\hat{Y_i} = 1 | {X_i}) =  \frac{1}{1 + e^{-{\beta}^T{X_i}}} $$
+
+This allows us to obtain a probability that $y_i$ is equal to 1 for each $x_i$, and we can also define a binary output if we compare that probability with a threshold of 0.5.
+
+
+## Learning
+
+We use the *Maximum Likelihood Estimation* (MLE) method to estimate $\beta$. For a fixed weights vector $\beta$, we can compute the probability that the model assigns to our entire dataset. For example, if we have the dataset $D = \{{X_1},{X_2},{X_3}\}$ and a set of outputs ${1,1,0}$, we can compute the probability of the dataset with the logistic regression model with weights $\beta$ as
+$$ P(D|{\beta}) = P(Y_1=1|X_1)P(Y_2=1|X_2)(1-P(Y_3=1|X_3). $$
+
+This value is also known as likelihood $L(\vec{\beta})$ of the parameters $\beta$ given the dataset $D$. If we used some other weights $\beta'$, we would end up with a different probability $L({\beta'})$. Our learning algorithm needs to find the weights $\beta$ that maximize this likelihood; in other words, the weights that provide the best fit to the data.
+
+
+## Interpretation and testing of the coefficients $\beta$
+
+As with linear regression, here we can also measure the statistical significance of variables. If we use the `summary` command of logistic regression, R will also output the deviance - a likelihood-based measure defined as
+$$ D = -2 \ln \frac{L(\beta \vert D)}{L(\beta_S \vert D)}, $$
+where the numerator contains the likelihood of the estimated model, and the denominator has the likelihood of the theoretically perfect model (also called the saturated model). The denominator is often ignored for simplicity, i.e. $L(\beta_S \vert D) = 1$.
+
+Deviance measures the quality of the estimated model in terms of goodness-of-fit (where a higher value denotes a better fit). The R output contains two deviance values (1) `null deviance` that describes the intercept-only model, and (2) `residual deviance` that includes all predictors. Using these two outputs, we can compute the pseudo-$R^2$ of the estimated model using:
+$$ R^2 = 1 - \frac{D_{mdl}}{D_0}. $$
+
+Important note: the $R^2$ above *does not* have the same interpretation of linear regression $R^2$:
+
+- it has no relation to the correlation coefficient,
+- it is not a proportion of variance explained by the model.
+
+However, it does measure how close the estimated model is to the null model.
+
+```{r}
+require(caret)
+
+logreg.mdl = glm(default ~ age + education + marriage + apartment + income + amount, data = creditdata, family = binomial())
+summary(logreg.mdl)
+
+Rsq = 1 - logreg.mdl$deviance/logreg.mdl$null.deviance
+Rsq
+```
+
+It is important to note that the ratio of labels in the target variable can significantly impact the model performance measures. *Confusion matrix* provides a more detailed look into the model outputs, as it is a contingency table of the true labels and ones obtained by the model. It has the following form:
+\begin{center}
+\begin{tabular}{l|c|c}
+      & $\hat{Y}=0$ & $\hat{Y}=1$\\
+\hline
+$Y=0$ & $TN$        & $FP$\\
+\hline
+$Y=1$ & $FN$        & $TP$\\
+\end{tabular}
+\end{center}
+
+A couple of frequently used measures are:
+
+- accuracy: $\dfrac{TP+TN}{TP+FP+TN+FN}$
+- precision: $\dfrac{TP}{TP+FP}$ (fraction of correctly classified examples among all examples labeled as TRUE)
+- recall: $\dfrac{TP}{TP+FN}$ (fraction of correctly classified examples among all examples that are actually TRUE)
+- specificity: $\dfrac{TN}{TN+FP}$ (fraction of correctly classified examples among all examples labeled as FALSE)
+
+There are other measures of classification performance, such as F1 or AUROC, that are outside of the scope of this exercise.
+
+```{r model analysis}
+
+yHat <- logreg.mdl$fitted.values >= 0.5
+tab <- table(creditdata$default, yHat)
+
+tab
+
+
+accuracy = sum(diag(tab)) / sum(tab)
+precision = tab[2,2] / sum(tab[,2])
+recall = tab[2,2] / sum(tab[2,])
+specificity = tab[1,1] / sum(tab[,1])
+
+accuracy
+precision
+recall
+specificity
+
+```
+
+## Likelihood ratio test
+
+Consider two logistic regression models $M_1$ and $M_2$, that use $N_1$ and $N_2$ predictors, respectively. Now the variable $-2\ln{\dfrac{L_1}{L_2}}$, were $L_1$ and $L_2$ denote the likelihoods of the two models, follows a $\chi^2$ distribution with $|N_1 - N_2|$ degrees of freedom. We can use this statistic to test the hypothesis if there is a significant difference in quality of between two models. In this context it is similar to the $F$-test we used with linear regression.
+
+For example, we can test if there is a difference between two models -- our original model, and another model with added interaction term. In this scenario we will accept the extended model if it has a significantly lower deviance. Likelihood ratio test will help us answer this question.
+
+```{r model testing with an additional regressor}
+
+logreg.mdl = glm(default ~ age + education + marriage + apartment + income + amount, data = creditdata, family = binomial())
+summary(logreg.mdl)
+
+logreg.mdl.2 = glm(default ~ age + education + marriage + apartment + income + amount + I(income/amount), data = creditdata, family = binomial())
+summary(logreg.mdl.2)
+
+anova(logreg.mdl, logreg.mdl.2, test = "LRT")
+```
+
+We can also test the difference between our original model and a reduced model that does not include some insignificant regressors. In this instance we'll accept the reduced model if the deviance didn't significantly increase.
+
+```{r model testing with regressor selection}
+
+logreg.mdl.3 = glm(default ~ education + marriage + income + amount, data = creditdata, family = binomial())
+summary(logreg.mdl.3)
+
+anova(logreg.mdl, logreg.mdl.3, test = "LRT")
+```
+
+Final model analysis:
+
+```{r final model analysis}
+
+yHat <- logreg.mdl.3$fitted.values > 0.5
+tab <- table(creditdata$default, yHat)
+
+tab
+
+
+accuracy = sum(diag(tab)) / sum(tab)
+precision = tab[2,2] / sum(tab[,2])
+recall = tab[2,2] / sum(tab[2,])
+specificity = tab[1,1] / sum(tab[,1])
+
+accuracy
+precision
+recall
+specificity
+```

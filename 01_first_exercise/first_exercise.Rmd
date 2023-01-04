@@ -1,0 +1,599 @@
+---
+title: "SAP - First auditory exercise"
+subtitle: "Case study *Iris data*: Descriptive statistics and data visualization"
+author: "Tessa Bauman, Stjepan Begušić, David Bojanić, Krunoslav Jurčić, Tomislav Kovačević, Andro Merćep"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+The exercises and the project in the course "Statistical Data Analysis" are performed in the R programming language, the RStudio working environment, in the form of R Markdown reports that combine text with program code and the output of code execution.
+
+Auditory exercises will deal with a concrete case study through which the practical application of the material presented in lectures will be demonstrated.
+
+## Case study: *Iris data*
+
+R includes various built-in datasets as part of the `datasets` package.
+
+```{r}
+library(help = "datasets")
+```
+
+One of the most famous data sets is Edgar Anderson's data on the lengths and widths of iris flower petals and sepals.
+
+```{r}
+help(iris)
+```
+
+The *iris* dataset consists of 3 types of iris flowers - *Iris setosa*, *versicolor*, and *virginica*.
+There are 150 examples in the dataset; each example contains 5 variables.
+
+First of all, it is important to know the context of the data! Data interpretation is an important part of data processing.
+Let's get to know the data set *iris*:
+
+```{r}
+# Loading the built-in data set and viewing the first few lines
+irisdata = iris
+head(irisdata)
+```
+
+What do individual variables represent? Which is which? What can we infer from them? What is their purpose? What kind of analysis can we perform? What results can we potentially get?
+
+```{r, fig.cap="Iris species", out.width = '100%'}
+knitr::include_graphics("iris-machinelearning.png")
+```
+
+```{r, fig.cap="Sepal and petal width and length", out.width = '50%', fig.align="center"}
+knitr::include_graphics("iris_petal-sepal-width-length.png")
+```
+
+Basic manipulations over the data set:
+
+```{r}
+# Dataset dimensions:
+dim(irisdata)  # number of rows (number of examples), number of columns (number of variables)
+nrow(irisdata) # number of rows
+ncol(irisdata) # number of columns -> what is the output of function length?
+names(irisdata) # column names
+```
+
+```{r}
+class(irisdata) 
+```
+
+```{r}
+# Introductory analysis, access to the columns of the data.frame object by name using the $ operator
+irisdata$Sepal.Length
+class(irisdata$Petal.Width)
+# the class of this variable is "numeric" -- an interval/rational scale variable -- which one in this case?
+
+irisdata$Species    
+class(irisdata$Species)
+# the class of this variable is "factor" -- a variable on a nominal/ordinal scale -- which of them in this case?
+```
+
+```{r}
+# Indexing
+
+# A single index extracts a column or all but certain columns
+irisdata[2]
+irisdata[c(2,4)]
+irisdata[-c(2,4)]
+
+# With a vector of two indices, the first represents a row and the second a column
+irisdata[c(2,5,6), 3:5]
+
+# Notice the difference:
+# rows number 3 and 4 and all the columns
+irisdata[c(3,4),]
+# all rows and the 3rd and 4th columns
+irisdata[,c(3,4)]
+irisdata[c(3,4)]
+```
+
+
+```{r}
+# More basic column manipulations:
+irisdata[c(2,5,6), c("Sepal.Width","Species")] 
+irisdata[c(2,5,6), -c(5)] 
+
+# Extract all rows where the Sepal Width is greater than 3.3:
+irisdata[irisdata$Sepal.Width > 3.3,]
+# Extract all columns except the Species column:
+irisdata[names(irisdata) != "Species"]
+# Extract all columns that describe the length:
+irisdata[names(irisdata) %in% c("Sepal.Length","Petal.Length")]
+# Print all Sepal Width for which Petal Length is greater than 1.4:
+irisdata$Sepal.Width[irisdata$Petal.Length > 1.4]
+# or:
+irisdata[irisdata$Petal.Length > 1.4,]$Sepal.Width
+
+# Extract all positions (indexes) for which the condition Sepal.Width > 3.3 applies and print all of those examples:
+ind = which(irisdata$Sepal.Width > 3.3)
+irisdata$Sepal.Width > 3.3
+ind
+irisdata[ind,]
+
+```
+
+## Measures of central tendency
+
+Measures of central tendency (or measures of centrality) describe a data set with a single value around which the data are grouped. The most commonly used measures of central tendency are: arithmetic mean, median, mode and trimmed arithmetic mean.
+
+```{r}
+# Arithmetic - mean
+mean(irisdata$Petal.Length)
+
+# Trimmed arithmetic mean with removal of 20% of the smallest and largest data
+mean(irisdata$Petal.Length, trim=0.2)
+
+# Median - a robust measure of central tendency (exactly 50% of the data is less and 50% of the data is greater than that value)
+median(irisdata$Petal.Length)
+
+# 1st, 2nd and 3rd quartile
+quantile(irisdata$Petal.Length, probs = c(0.25,0.5,0.75)) 
+# Which quartile is also the median?
+
+# Mode (most frequent value) - the value that appears most often in the data. When does this measure make sense?
+require(modeest)
+mfv(irisdata$Petal.Length)
+```
+
+## Measures of dispersion
+Measures of dispersion describe the variability of the data, how concentrated or spread the data is. The most commonly used measures are: range, interquartile range, variance, standard deviation and coefficient of variation.
+
+```{r}
+# Range - the difference between the largest and smallest value in the data
+max(irisdata$Petal.Length)-min(irisdata$Petal.Length)
+
+# Interquartile range - the difference between the third and first quartile of the data --> Why is this a more robust measure than the previous one?
+IQR(irisdata$Petal.Length)
+
+# Variance and standard deviation - the most commonly used measures of dispersion
+var(irisdata$Petal.Length)
+sd(irisdata$Petal.Length)
+sqrt(var(irisdata$Petal.Length))
+# Does var() compute an unbiased variance estimate?
+help(var)
+
+# Coefficient of variation - a relative measure of dispersion that describes the dispersion of data in relation to their arithmetic mean. When is it appropriate to use this measure?
+
+sd(irisdata$Petal.Length)/mean(irisdata$Petal.Length)
+```
+
+## Basic descriptive statistics and (advanced) data manipulation
+
+```{r}
+# Basic descriptive statistics
+summary(irisdata)
+```
+
+Let's calculate the means and medians of all iris measures, separately for each type of iris in the data.
+How different are the means and medians for each type, and what does this say about the shape of the distribution of those measures?
+
+Let's also calculate a more robust estimate by calculating the trimmed arithmetic mean with the removal of 10\% of the largest and smallest values.
+
+```{r}
+# tidyverse - a very useful set of libraries that allows an even more elegant manipulation of data frames
+# https://www.tidyverse.org/packages/
+
+library(tidyverse)
+library(dplyr)
+
+irisdata %>% group_by(Species) %>% summarise(
+          Mean.Sep.Len = mean(Sepal.Length),
+          Mean.Pet.Len = mean(Petal.Length),
+          Mean.Sep.Wid = mean(Sepal.Width),
+          Mean.Pet.Wid = mean(Petal.Width)
+            ) -> summary.result1
+summary.result1
+
+
+irisdata %>% group_by(Species) %>% summarise(
+          Med.Sep.Len = median(Sepal.Length),
+          Med.Pet.Len = median(Petal.Length),
+          Med.Sep.Wid = median(Sepal.Width),
+          Med.Pet.Wid = median(Petal.Width)
+            ) -> summary.result2
+summary.result2
+
+# Arithmetic trimmed mean -- why is this a more robust method than the simple mean?
+
+irisdata %>% group_by(Species) %>% summarise(
+          MeanTr.Sep.Len = mean(Sepal.Length, trim = 0.1),
+          MeanTr.Pet.Len = mean(Petal.Length, trim = 0.1),
+          MeanTr.Sep.Wid = mean(Sepal.Width, trim = 0.1),
+          MeanTr.Pet.Wid = mean(Petal.Width, trim = 0.1)
+            ) -> summary.result3
+summary.result3
+
+# So far we have calculated measures of central tendency for all species together - but we see that when we separate them by group, the species cluster around potentially different values
+
+# Compare the median and the mean for petal length calculated for all species together, then calculated for all species separately.
+```
+
+```{r}
+# Using summary() of statistics for a particular type:
+summary(irisdata[irisdata["Species"] == c("setosa"),])
+summary(irisdata[irisdata["Species"] == c("versicolor"),])
+summary(irisdata[irisdata["Species"] == c("virginica"),])
+
+# One more way:
+aggregate(irisdata[names(irisdata) != "Species"], list(irisdata$Species), mean)
+aggregate(irisdata[names(irisdata) != "Species"], list(irisdata$Species), median)
+aggregate(irisdata[names(irisdata) != "Species"], list(irisdata$Species), mean,trim=0.1)
+
+# Advantage of tidyverse?
+```
+
+When does it make sense (for what kind of data) to use these descriptive statistics?
+Let's say that an increasing time series  is given. Would you apply measures of central tendency to such data?
+
+We emphasize again the importance of context and data interpretation!
+
+Let's now calculate the interquartile range (IQR) and standard deviation of all measures for each of the iris types separately.
+
+```{r}
+irisdata %>% group_by(Species) %>% summarise(
+          IQR.Sep.Len = IQR(Sepal.Length),
+          IQR.Pet.Len = IQR(Petal.Length),
+          IQR.Sep.Wid = IQR(Sepal.Width),
+          IQR.Pet.Wid = IQR(Petal.Width)
+            ) -> summary.result
+summary.result
+
+irisdata %>% group_by(Species) %>% summarise(
+          sd.Sep.Len = sd(Sepal.Length),
+          sd.Pet.Len = sd(Petal.Length),
+          sd.Sep.Wid = sd(Sepal.Width),
+          sd.Pet.Wid = sd(Petal.Width)
+            ) -> summary.result
+summary.result
+
+# Compare once again these measurements for petal length calculated for all species together, then calculated for all species separately.
+
+# From these statistics, can we conclude something about the variability and dispersion of sepal length of different types of iris? What could the different order of magnitude of these two measures indicate? Later, on the box plot of sepal length, it can be seen that the species virginica has a protruding value precisely for sepal length.
+
+# When are certain measures more applicable? Which one is more applicable to the iris dataset?
+```
+
+## Data visualization
+
+The visualization again depends a lot on the context of the data. Some of the basic ways to visualize the data are:
+
+* Histogram - shows the shape of the distribution and the density of the data, and is based on grouping the variables into classes
+* Box plot - combines the display of the median, data quartiles, and the smallest and largest values. Box plot also shows outliers, which are defined as data above $Q_3+1.5\cdot IQR$ or below $Q_1-1.5\cdot IQR$.
+* Scatter plot - is one of the most important ways of displaying bivariate data, and provides information about the relationship of variables.
+
+We are interested in how the length of petals is distributed - let's show it with a histogram.
+How to choose the class number? What are the class boundaries? Is it better to display data aggregated or grouped? Do we want to display frequencies or relative frequencies?
+
+```{r}
+h = hist(irisdata$Sepal.Length,
+         breaks=3,
+         main="Sepal length histogram, breaks = 3",
+         xlab="Sepal length [cm]",
+         ylab='Frequency',
+         col="blue"
+         )
+
+h = hist(irisdata$Sepal.Length,
+         breaks=100,
+         main="Sepal length histogram, breaks = 100",
+         xlab="Sepal length [cm]",
+         ylab='Frequency',
+         col="blue"
+         )
+
+h = hist(irisdata$Sepal.Length,
+         main="Sepal length histogram, breaks = ?",
+         xlab="Sepal length [cm]",
+         ylab='Frequency',
+         col="blue"
+         )
+
+abline(v = mean(irisdata$Sepal.Length), col = "red", lwd = 4)
+
+# Can we conclude from this histogram that this is a multimodal distribution?
+```
+
+```{r}
+h = hist(irisdata$Petal.Length,
+         main="Petal length histogram",
+         xlab="Petal length [cm]",
+         ylab='Frequency',
+         ylim= c(0,40)
+         )
+
+mfv(irisdata$Petal.Length)
+
+```
+
+```{r}
+h = hist(irisdata$Sepal.Length,
+         breaks=15,
+         main="Sepal length histogram, breaks = 15",
+         xlab="Sepal length [cm]",
+         ylab='Frequency',
+         col="lightblue"
+         )
+# Histogram of sepal length with approx. 15 classes (R function sees the number of classes as a "suggestion")
+
+# Way to reach breakpoints:
+h$breaks
+length(h$breaks)
+```
+
+
+```{r}
+# If we want to give the exact number of classes, we have to define breakpoints
+
+b = seq(min(irisdata$Sepal.Length) - 0.1,max(irisdata$Sepal.Length) + 0.1,0.2)
+length(b)
+h = hist(irisdata$Sepal.Length,
+         breaks=b,
+         main="Sepal length histogram",
+         xlab="Sepal length [cm]",
+         ylab='Frequency',
+         col="lightblue"
+         )
+
+# Number of classes and frequencies:
+length(h$breaks)
+h$counts
+
+# Histogram showing relative frequencies:
+h = hist(irisdata$Sepal.Length,
+         prob=TRUE,
+         breaks=15,
+         main="Sepal length histogram",
+         xlab="Sepal length [cm]",
+         ylab='Frequency',
+         col="lightblue"
+         )
+
+# Number of classes and relative frequencies:
+length(h$breaks)
+h$density
+
+```
+
+Barplot:
+
+```{r}
+# If we have frequencies:
+data.counts = h$counts
+barplot(data.counts,
+        main="Sepal length histogram",
+        xlab="Sepal length [cm]",
+        ylab='Frequency',
+        col="pink")
+
+data.counts = h$density
+barplot(data.counts,
+        main="Sepal length histogram",
+        xlab="Sepal length [cm]",
+        ylab='Frequency',
+        col="pink")
+```
+
+Comparison of grouped data:
+
+```{r}
+# If we group the data and then make a histogram:
+b = seq(min(irisdata$Sepal.Length) - 0.1,max(irisdata$Sepal.Length) + 0.1,0.2)
+
+h1 = hist(irisdata[irisdata["Species"] == c("setosa"),]$Sepal.Length,
+         breaks=b,
+         plot=FALSE)
+h2 = hist(irisdata[irisdata["Species"] == c("versicolor"),]$Sepal.Length,
+         breaks=b,
+         plot=FALSE)
+h3 = hist(irisdata[irisdata["Species"] == c("virginica"),]$Sepal.Length,
+         breaks=b,
+         plot=FALSE)
+
+data <- t(cbind(h1$counts,h2$counts,h3$counts))
+data
+barplot(data,beside=TRUE, col=c("lightblue", "purple", "lightgreen"), xlab="Sepal length [cm]", ylab='Frequency',)
+legend("topleft",c("setosa","versicolor","virginica"),fill = c("lightblue", "purple", "lightgreen"))
+
+
+```
+
+Compare box plots for different iris species for individual variables.
+
+```{r}
+# Box plot for versicolor species for sepal length:
+boxplot(irisdata[irisdata["Species"]=="versicolor",]$Sepal.Length,
+        main='Sepal length box-plot',
+        ylab='Sepal length [cm]')
+
+# The values of in the box plot come from descriptive statistics:
+summary(irisdata[irisdata["Species"]=="versicolor",]$Sepal.Length)
+```
+
+```{r}
+# Box plot for sepal length, multiple species:
+boxplot(Sepal.Length ~ Species,data=irisdata)
+
+aggregate(irisdata[names(irisdata) != "Species"]$Sepal.Length, list(irisdata$Species), median)
+summary(irisdata[irisdata["Species"]=="virginica",]$Sepal.Length)
+
+boxplot(irisdata[irisdata["Species"]=="virginica",]$Sepal.Length,
+        main='Sepal length box-plot',
+        ylab='Sepal length [cm]',
+        range=1.5)
+
+```
+
+Can we infer any connection between sepal length and width from the scatterplot?
+
+Make it clear from the graph which point represents which type of iris - can we infer anything from this representation?
+
+```{r}
+# Without differentiating between iris types:
+plot(irisdata$Sepal.Length,irisdata$Sepal.Width,
+     col="blue",
+     xlab='Sepal length [cm]',
+     ylab='Sepal width [cm]')
+
+# With differentiating between iris types:
+plot(irisdata$Sepal.Length[irisdata$Species=='setosa'],
+     irisdata$Sepal.Width[irisdata$Species=='setosa'],
+     col='blue',
+     xlim=c(min(irisdata$Sepal.Length),max(irisdata$Sepal.Length)),
+     ylim=c(min(irisdata$Sepal.Width),max(irisdata$Sepal.Width)),
+     xlab='Sepal length [cm]',
+     ylab='Sepal width [cm]')
+
+points(irisdata$Sepal.Length[irisdata$Species=='versicolor'],
+       irisdata$Sepal.Width[irisdata$Species=='versicolor'],col='red')
+points(irisdata$Sepal.Length[irisdata$Species=='virginica'],
+       irisdata$Sepal.Width[irisdata$Species=='virginica'],col='green')
+```
+
+What can we infer if we show a scatterplot for petal lengths and widths?
+
+```{r}
+# Scatterplot for petals
+plot(irisdata$Petal.Length[irisdata$Species=='setosa'],
+     irisdata$Petal.Width[irisdata$Species=='setosa'],
+     col='blue',
+     xlim=c(min(irisdata$Petal.Length),max(irisdata$Petal.Length)),
+     ylim=c(min(irisdata$Petal.Width),max(irisdata$Petal.Width)),
+     xlab='Petal length [cm]',
+     ylab='Petal width [cm]')
+
+points(irisdata$Petal.Length[irisdata$Species=='versicolor'],
+       irisdata$Petal.Width[irisdata$Species=='versicolor'],col='red')
+points(irisdata$Petal.Length[irisdata$Species=='virginica'],
+       irisdata$Petal.Width[irisdata$Species=='virginica'],col='green')
+```
+
+
+## Dirty data
+
+In addition to the built-in data sets, we can also load data from files of various formats into R.
+
+What have we neglected so far, or have taken for granted?
+
+When loading data from files, it may happen that the types of some variables are incorrectly recognized -- in this case, it is necessary to check the types and correct them manually.
+Also, it is possible that some values are missing in the data, which in the loaded `data.frame` take the value `NA`.
+It is also possible that some values were entered incorrectly or loaded incorrectly.
+
+```{r}
+# Loading data from a csv file:
+iris.modif = read.table("iris_mod.txt")
+head(iris.modif)
+```
+
+We see that everything was loaded incorrectly because it is not a good separator, so let's fix the separator:
+
+```{r}
+iris.modif = read.table("iris_mod.txt", sep = ",")
+head(iris.modif)
+dim(iris.modif)
+
+```
+
+Are the column classes correct?
+
+```{r}
+class(iris.modif$Species)
+# The class is an integer - we don't want that because it's an iris type --> categorical variable!
+iris.modif$Species = as.factor(iris.modif$Species)
+class(iris.modif$Species)
+iris.modif$Species
+
+iris.modif$Petal.Width
+
+```
+
+Are there any missing values?
+
+```{r}
+# is.na will return a logical vector that has TRUE in places where sub$Petal.Length has NA:
+sum(is.na(iris.modif$Petal.Length)) # How many?
+sum(is.na(iris.modif$Sepal.Length)) # How many?
+sum(is.na(iris.modif$Petal.Width)) # How many?
+sum(is.na(iris.modif$Sepal.Width)) # How many?
+sum(is.na(iris.modif$Species)) # How many?
+
+# complete.cases will return a logical value for each line;
+# Value is FALSE --> at least one element of row NA
+sum(!complete.cases(iris.modif)) 
+
+# Which rows contain NA values?
+iris.modif[!complete.cases(iris.modif),]
+
+# Discarding missing values
+iris.modif.full = iris.modif[complete.cases(iris.modif),]
+
+iris.modif.full %>% group_by(Species) %>% summarise(
+          count = n())
+
+```
+
+Descriptive statistics:
+
+```{r}
+summary(iris.modif.full)
+
+
+boxplot(Petal.Width ~ Species,data=iris.modif.full)
+
+iris.modif.full %>% group_by(Species) %>% summarise(
+          sd = sd(Petal.Width),
+          IQR = IQR(Petal.Width),
+          mean= mean(Petal.Width)
+            ) -> summary.result
+summary.result
+
+plot(iris.modif.full$Petal.Width[iris.modif.full$Species==1],
+     col='blue',
+     ylim=c(min(iris.modif.full$Petal.Width),max(iris.modif.full$Petal.Width)),
+     ylab='Petal width [cm]')
+points(iris.modif.full$Petal.Width[iris.modif.full$Species==2],col='red')
+points(iris.modif.full$Petal.Width[iris.modif.full$Species==3],col='dark green')
+
+```
+
+Which outlier is that? Is that outlier a correct value?
+```{r}
+ind = which(iris.modif.full$Petal.Width >20)
+iris.modif.full[ind,]
+iris.cleaned = iris.modif.full[-ind,]
+
+summary(iris.cleaned)
+```
+
+```{r}
+boxplot(Petal.Width ~ Species,data=iris.cleaned)
+
+iris.cleaned %>% group_by(Species) %>% summarise(
+          sd = sd(Petal.Width),
+          IQR = IQR(Petal.Width),
+          mean= mean(Petal.Width)
+            ) -> summary.result
+
+plot(iris.cleaned$Petal.Width[iris.cleaned$Species==1],
+     col='blue',
+     ylim=c(min(iris.cleaned$Petal.Width),max(iris.cleaned$Petal.Width)),
+     ylab='Petal width [cm]')
+points(iris.cleaned$Petal.Width[iris.cleaned$Species==2],col='red')
+points(iris.cleaned$Petal.Width[iris.cleaned$Species==3],col='dark green')
+
+```
+
+Is dropping rows with missing values always the best solution?
+
+For example, let's assume that we have 1000 data (rows) described by 150 variables (columns), and in 90% of them the variable under serial number 84 has NA (the others are present). If we were to remove all lines where the `complete.cases()` function takes the value `FALSE`, we would drastically reduce the data set (10 times!). On the other hand, if we remove only column 84, we still have 1000 data (but one less variable -- one less column).
+Sometimes we will be able to fill in the missing values manually, and sometimes the missing value will carry some additional information.
+
+How we treat missing values will depend primarily on the data set itself, that is, the context of the data. At the end of these exercises, once again, we emphasize the importance of data interpretation!
+
