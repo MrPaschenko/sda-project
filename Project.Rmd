@@ -1,6 +1,8 @@
 ---
 title: "Project"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
 date: "2022-12-19"
 ---
 
@@ -8,22 +10,61 @@ date: "2022-12-19"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## Does the water heating method depend on the number of household members?
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+Creating frame from 2 data sets for analysis
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r}
+data <- hogar_epf_2019
+heating_type <- data$FUENAGUA
+members <- data$NMIEMB
+frame_q1 <- data.frame(heating_type, members)
+frame_q1
 ```
 
-## Including Plots
+Clearing the frame_q1 from NA values
 
-You can also embed plots, for example:
+```{r}
+frame_q1_clear <- na.omit(frame_q1)
+frame_q1_clear <- frame_q1_clear[!grepl(9, frame_q1_clear$heating_type),]
+frame_q1_clear <- frame_q1_clear[!grepl("b", frame_q1_clear$heating_type),]
+frame_q1_clear <- frame_q1_clear[!grepl(0, frame_q1_clear$members),]
+frame_q1_clear
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+#s1 <- subset(frame_q1_clear, frame_q1_clear$heating_type==1)
+#nrow(s1[s1$members ==1,])
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+#library("gplots")
+#dt <- data.matrix(frame_q1_clear)
+#print(class(frame_q1_clear))
+#frame_q1_plot <- balloonplot(t(dt), main="Xui", xlab="", ylab="",
+#                             label = FALSE, show.margins = FALSE)
+```
+
+```{r}
+#library("graphics")
+#mosaicplot(dt, shade = TRUE, las = 100, main = "hui")
+```
+
+```{r}
+chisq <- chisq.test(frame_q1_clear$heating_type, frame_q1_clear$members)
+
+```
+
+```{r}
+matrix_q1 <- data.matrix(chisq$observed)
+matrix_q1
+```
+
+```{r}
+frame_q1_plot <- balloonplot(t(matrix_q1), main="Xui", xlab="", ylab="",
+                        label = FALSE, show.margins = FALSE)
+
+```
+
+```{r}
+library("graphics")
+mosaicplot(matrix_q1, shade = TRUE, las = 100, main = "hui")
+```
