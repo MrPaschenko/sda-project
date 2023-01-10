@@ -1,6 +1,8 @@
 ---
 title: "Project"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
 date: "2022-12-19"
 ---
 
@@ -8,22 +10,77 @@ date: "2022-12-19"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## Does the water heating method depend on the number of household members?
+##http://www.sthda.com/english/wiki/chi-square-test-of-independence-in-r#:~:text=The%20chi%2Dsquare%20test%20of,categories%20of%20the%20two%20variables.
+Creating frame from 2 data sets for analysis
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r}
+data <- hogar_epf_2019
+heating_type <- data$FUENAGUA
+members <- data$NMIEMB
+frame_q1 <- data.frame(heating_type, members)
+frame_q1
 ```
 
-## Including Plots
+Clearing the frame_q1 from NA values
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+frame_q1_clear <- na.omit(frame_q1)
+frame_q1_clear <- frame_q1_clear[!grepl(9, frame_q1_clear$heating_type),]
+frame_q1_clear <- frame_q1_clear[!grepl("b", frame_q1_clear$heating_type),]
+frame_q1_clear <- frame_q1_clear[!grepl(0, frame_q1_clear$members),]
+frame_q1_clear
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+Preparing matrix for plots
+```{r}
+matrix_q1 <- data.matrix(chisq$observed)
+matrix_q1
+```
+
+Drawing plots (balloon and mosaic)
+```{r}
+library("graphics")
+library("gplots")
+q1_balloonplot <- balloonplot(t(matrix_q1), main="Xui", xlab="", ylab="",
+                        label = FALSE, show.margins = FALSE)
+
+q1_mosaicplot <- mosaicplot(matrix_q1, shade = TRUE, las = 100, main = "hui")
+```
+
+Chi-square test
+```{r}
+chisq <- chisq.test(frame_q1_clear$heating_type, frame_q1_clear$members)
+
+```
+
+Pearson residuals can be easily extracted from the output of the function chisq.test():
+```{r}
+Pearson_residuals <- round(chisq$residuals, 3)
+```
+
+Let’s visualize Pearson residuals using the package corrplot:
+```{r}
+library(corrplot)
+corrplot(chisq$residuals, is.cor = FALSE)
+```
+
+r is the residual of the cell
+```{r}
+contrib <- 100*chisq$residuals^2/chisq$statistic
+round(contrib, 3)
+```
+
+Visualize the contribution
+```{r}
+q1_corrplot <- corrplot(contrib, is.cor = FALSE)
+```
+
+Access to the values returned by chisq.test() function
+```{r}
+#p-value
+p-value <- chisq$p.value
+#mean
+q1_mean <- chisq$estimate
+```
+
