@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## Does the water heating method depend on the number of household members?
-
+##http://www.sthda.com/english/wiki/chi-square-test-of-independence-in-r#:~:text=The%20chi%2Dsquare%20test%20of,categories%20of%20the%20two%20variables.
 Creating frame from 2 data sets for analysis
 
 ```{r}
@@ -30,41 +30,57 @@ frame_q1_clear <- frame_q1_clear[!grepl(9, frame_q1_clear$heating_type),]
 frame_q1_clear <- frame_q1_clear[!grepl("b", frame_q1_clear$heating_type),]
 frame_q1_clear <- frame_q1_clear[!grepl(0, frame_q1_clear$members),]
 frame_q1_clear
-
-#s1 <- subset(frame_q1_clear, frame_q1_clear$heating_type==1)
-#nrow(s1[s1$members ==1,])
 ```
 
-```{r}
-#library("gplots")
-#dt <- data.matrix(frame_q1_clear)
-#print(class(frame_q1_clear))
-#frame_q1_plot <- balloonplot(t(dt), main="Xui", xlab="", ylab="",
-#                             label = FALSE, show.margins = FALSE)
-```
-
-```{r}
-#library("graphics")
-#mosaicplot(dt, shade = TRUE, las = 100, main = "hui")
-```
-
-```{r}
-chisq <- chisq.test(frame_q1_clear$heating_type, frame_q1_clear$members)
-
-```
-
+Preparing matrix for plots
 ```{r}
 matrix_q1 <- data.matrix(chisq$observed)
 matrix_q1
 ```
 
-```{r}
-frame_q1_plot <- balloonplot(t(matrix_q1), main="Xui", xlab="", ylab="",
-                        label = FALSE, show.margins = FALSE)
-
-```
-
+Drawing plots (balloon and mosaic)
 ```{r}
 library("graphics")
-mosaicplot(matrix_q1, shade = TRUE, las = 100, main = "hui")
+library("gplots")
+q1_balloonplot <- balloonplot(t(matrix_q1), main="Xui", xlab="", ylab="",
+                        label = FALSE, show.margins = FALSE)
+
+q1_mosaicplot <- mosaicplot(matrix_q1, shade = TRUE, las = 100, main = "hui")
 ```
+
+Chi-square test
+```{r}
+chisq <- chisq.test(frame_q1_clear$heating_type, frame_q1_clear$members)
+
+```
+
+Pearson residuals can be easily extracted from the output of the function chisq.test():
+```{r}
+Pearson_residuals <- round(chisq$residuals, 3)
+```
+
+Let’s visualize Pearson residuals using the package corrplot:
+```{r}
+library(corrplot)
+corrplot(chisq$residuals, is.cor = FALSE)
+```
+
+r is the residual of the cell
+```{r}
+contrib <- 100*chisq$residuals^2/chisq$statistic
+round(contrib, 3)
+```
+
+Visualize the contribution
+```{r}
+q1_corrplot <- corrplot(contrib, is.cor = FALSE)
+```
+
+Access to the values returned by chisq.test() function
+```{r}
+#p-value
+p-value <- chisq$p.value
+#mean
+q1_mean <- chisq$estimate
+```
+
